@@ -2,14 +2,18 @@
     "config": {
         "step": {
             "user": {
-                "title": "Yale Doorman L3S",
-                "description": "Enter your lock's BLE details. You can find the BLE key in Home Assistant's debug logs when using the official Yale integration.",
+                "title": "Yale Doorman L3S Setup",
+                "description": "If your lock was discovered, the details are pre-filled below. Otherwise, enter them manually.\n\n**BLE Key:** If you have the 'August' cloud integration installed, the key might be auto-filled. If not, you must extract it from the cloud integration's debug logs.",
                 "data": {
                     "address": "BLE Address",
                     "local_name": "Local Name (optional)",
                     "key": "BLE Offline Key (32-char hex)",
                     "slot": "Key Slot"
                 }
+            },
+            "bluetooth_confirm": {
+                "title": "Discovered Yale Doorman",
+                "description": "Do you want to set up {name} ({address})?"
             }
         },
         "error": {

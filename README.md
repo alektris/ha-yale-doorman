@@ -29,15 +29,23 @@ Provides real-time lock state, door sensor, battery monitoring, and lock/unlock 
 1. Copy `custom_components/yale_doorman/` to your HA `custom_components/` directory
 2. Restart Home Assistant
 
-## Setup
+## Configuration
 
-1. Go to **Settings → Devices & Services → Add Integration**
-2. Search for **Yale Doorman L3S**
-3. Enter your lock's BLE details:
-   - **BLE Address** — MAC address (e.g. `98:1B:B5:B0:8C:A9`)
-   - **Local Name** — BLE broadcast name (e.g. `L700RXG`)
-   - **BLE Key** — 32-character hex offline key
-   - **Key Slot** — Key index (usually `1`)
+### Method 1: Auto-Discovery (Recommended)
+1. Ensure your Yale Doorman L3S lock is within Bluetooth range of your Home Assistant server (or a Bluetooth proxy).
+2. Go to **Settings > Devices & Services**.
+3. You should see a new discovered device: **Yale Doorman**.
+4. Click **Configure**.
+5. If you have the **August** cloud integration installed and configured, the offline key may be automatically filled in for you.
+   - If not, you will need to manually enter the **BLE Offline Key** (32-character hex) and **Slot**.
+6. Submit the form.
+
+### Method 2: Manual Setup
+1. Go to **Settings > Devices & Services**.
+2. Click **Add Integration** and search for **Yale Doorman L3S**.
+3. Enter the **BLE Address** (e.g., `AA:BB:CC:DD:EE:FF`).
+4. Enter the **BLE Offline Key** and **Slot**.
+5. Submit.
 
 ### Getting Your BLE Key
 

@@ -1,90 +1,86 @@
 """Config flow for the Yale Doorman L3S integration."""
-
 from __future__ import annotations
-
 import logging
 import re
 from typing import Any
-
 import voluptuous as vol
-
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from bluetooth_adapters import BluetoothServiceInfoBleak
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
-
 from .const import (
-    CONF_ACTIVE_HOURS_END,
-    CONF_ACTIVE_HOURS_START,
-    CONF_ACTIVE_POLL_INTERVAL,
-    CONF_ALWAYS_CONNECTED,
-    CONF_IDLE_POLL_INTERVAL,
-    CONF_KEY,
-    CONF_LOCAL_NAME,
-    CONF_SLOT,
-    DEFAULT_ACTIVE_HOURS_END,
-    DEFAULT_ACTIVE_HOURS_START,
-    DEFAULT_ACTIVE_POLL_INTERVAL,
-    DEFAULT_ALWAYS_CONNECTED,
-    DEFAULT_IDLE_POLL_INTERVAL,
-    DOMAIN,
+    CONF_ACTIVE_HOURS_END, CONF_ACTIVE_HOURS_START, CONF_ACTIVE_POLL_INTERVAL,
+    CONF_ALWAYS_CONNECTED, CONF_IDLE_POLL_INTERVAL, CONF_KEY, CONF_LOCAL_NAME,
+    CONF_SLOT, DEFAULT_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_START,
+    DEFAULT_ACTIVE_POLL_INTERVAL, DEFAULT_ALWAYS_CONNECTED, DEFAULT_IDLE_POLL_INTERVAL, DOMAIN
 )
 
 _LOGGER = logging.getLogger(__name__)
-
 MAC_REGEX = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 HEX_KEY_REGEX = re.compile(r"^[0-9A-Fa-f]{32}$")
 TIME_REGEX = re.compile(r"^\d{1,2}:\d{2}$")
 
-
 class YaleDoormanConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Config flow for Yale Doorman L3S."""
-
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._discovery_info: BluetoothServiceInfoBleak | None = None
+        self._discovered_key: str | None = None
+        self._discovered_slot: int = 1
 
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: ConfigEntry,
-    ) -> YaleDoormanOptionsFlow:
-        """Get the options flow handler."""
+    def async_get_options_flow(config_entry: ConfigEntry) -> YaleDoormanOptionsFlow:
         return YaleDoormanOptionsFlow(config_entry)
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_bluetooth(self, discovery_info: BluetoothServiceInfoBleak) -> ConfigFlowResult:
+        """Handle bluetooth discovery."""
+        await self.async_set_unique_id(discovery_info.address)
+        self._abort_if_unique_id_configured()
+        self._discovery_info = discovery_info
+
+        # Try to retrieve key from yalexs_ble config cache
+        key, slot = self._try_get_key_from_cache(discovery_info.address)
+        if key:
+            self._discovered_key = key
+            self._discovered_slot = slot
+            _LOGGER.debug("Found key in yalexs_ble cache for %s", discovery_info.address)
+
+        self.context["title_placeholders"] = {
+            "name": discovery_info.name,
+            "address": discovery_info.address,
+        }
+        return await self.async_step_user()
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial setup step."""
         errors: dict[str, str] = {}
+        default_address, default_name, default_key, default_slot = "", "", "", 1
+
+        if self._discovery_info:
+            default_address = self._discovery_info.address
+            default_name = self._discovery_info.name
+        if self._discovered_key:
+            default_key = self._discovered_key
+        if self._discovered_slot:
+            default_slot = self._discovered_slot
 
         if user_input is not None:
-            # Validate BLE address
             address = user_input[CONF_ADDRESS].strip().upper()
             if not MAC_REGEX.match(address):
                 errors[CONF_ADDRESS] = "invalid_mac"
-
-            # Validate BLE key
             key = user_input[CONF_KEY].strip().lower()
             if not HEX_KEY_REGEX.match(key):
                 errors[CONF_KEY] = "invalid_key"
-
-            # Validate slot
             slot = user_input[CONF_SLOT]
             if slot < 0 or slot > 255:
                 errors[CONF_SLOT] = "invalid_slot"
 
             if not errors:
                 local_name = user_input.get(CONF_LOCAL_NAME, "").strip()
-
-                # Check for duplicate entries
                 await self.async_set_unique_id(address)
                 self._abort_if_unique_id_configured()
-
                 title = local_name or f"Yale Doorman ({address[-8:]})"
-
                 return self.async_create_entry(
                     title=title,
                     data={
@@ -104,39 +100,38 @@ class YaleDoormanConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_ADDRESS): str,
-                    vol.Optional(CONF_LOCAL_NAME, default=""): str,
-                    vol.Required(CONF_KEY): str,
-                    vol.Required(CONF_SLOT, default=1): int,
-                }
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_ADDRESS, default=default_address): str,
+                vol.Optional(CONF_LOCAL_NAME, default=default_name): str,
+                vol.Required(CONF_KEY, default=default_key): str,
+                vol.Required(CONF_SLOT, default=default_slot): int,
+            }),
             errors=errors,
+            description_placeholders={"name": default_name, "address": default_address},
         )
 
+    def _try_get_key_from_cache(self, address: str) -> tuple[str | None, int]:
+        try:
+            from homeassistant.components.yalexs_ble.config_cache import async_get_validated_config
+            if config := async_get_validated_config(self.hass, address):
+                return config.key, config.slot
+        except ImportError:
+            pass
+        except Exception as ex:
+            _LOGGER.debug("Error retrieving key from yalexs_ble cache: %s", ex)
+        return None, 1
 
 class YaleDoormanOptionsFlow(OptionsFlow):
-    """Options flow for Yale Doorman L3S."""
-
     def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
         self._config_entry = config_entry
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle options."""
         errors: dict[str, str] = {}
-
         if user_input is not None:
             # Validate time format
-            start = user_input.get(
-                CONF_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START
-            )
-            end = user_input.get(
-                CONF_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END
-            )
+            start = user_input.get(CONF_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)
+            end = user_input.get(CONF_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END)
             if not TIME_REGEX.match(start):
                 errors[CONF_ACTIVE_HOURS_START] = "invalid_time"
             if not TIME_REGEX.match(end):
@@ -146,47 +141,14 @@ class YaleDoormanOptionsFlow(OptionsFlow):
                 return self.async_create_entry(title="", data=user_input)
 
         current = self._config_entry.options
-
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_ALWAYS_CONNECTED,
-                        default=current.get(
-                            CONF_ALWAYS_CONNECTED,
-                            DEFAULT_ALWAYS_CONNECTED,
-                        ),
-                    ): bool,
-                    vol.Required(
-                        CONF_ACTIVE_HOURS_START,
-                        default=current.get(
-                            CONF_ACTIVE_HOURS_START,
-                            DEFAULT_ACTIVE_HOURS_START,
-                        ),
-                    ): str,
-                    vol.Required(
-                        CONF_ACTIVE_HOURS_END,
-                        default=current.get(
-                            CONF_ACTIVE_HOURS_END,
-                            DEFAULT_ACTIVE_HOURS_END,
-                        ),
-                    ): str,
-                    vol.Required(
-                        CONF_ACTIVE_POLL_INTERVAL,
-                        default=current.get(
-                            CONF_ACTIVE_POLL_INTERVAL,
-                            DEFAULT_ACTIVE_POLL_INTERVAL,
-                        ),
-                    ): vol.All(int, vol.Range(min=30, max=3600)),
-                    vol.Required(
-                        CONF_IDLE_POLL_INTERVAL,
-                        default=current.get(
-                            CONF_IDLE_POLL_INTERVAL,
-                            DEFAULT_IDLE_POLL_INTERVAL,
-                        ),
-                    ): vol.All(int, vol.Range(min=300, max=7200)),
-                }
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_ALWAYS_CONNECTED, default=current.get(CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED)): bool,
+                vol.Required(CONF_ACTIVE_HOURS_START, default=current.get(CONF_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)): str,
+                vol.Required(CONF_ACTIVE_HOURS_END, default=current.get(CONF_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END)): str,
+                vol.Required(CONF_ACTIVE_POLL_INTERVAL, default=current.get(CONF_ACTIVE_POLL_INTERVAL, DEFAULT_ACTIVE_POLL_INTERVAL)): vol.All(int, vol.Range(min=30, max=3600)),
+                vol.Required(CONF_IDLE_POLL_INTERVAL, default=current.get(CONF_IDLE_POLL_INTERVAL, DEFAULT_IDLE_POLL_INTERVAL)): vol.All(int, vol.Range(min=300, max=7200)),
+            }),
             errors=errors,
         )
