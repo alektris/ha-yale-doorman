@@ -1,12 +1,6 @@
 # Yale Doorman L3S for Home Assistant
 
-# Yale Doorman L3S for Home Assistant
-
 <img src="https://brands.home-assistant.io/_/yalexs_ble/icon@2x.png" width="100" alt="Icon">
-
-
-
-
 Custom Home Assistant integration for the **Yale Doorman L3S** smart lock via Bluetooth Low Energy (BLE).
 
 Provides real-time lock state, door sensor, battery monitoring, and lock/unlock control — all over direct BLE communication using offline keys (no cloud dependency).
