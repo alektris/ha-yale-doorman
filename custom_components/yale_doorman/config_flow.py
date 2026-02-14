@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any
 import voluptuous as vol
-from bluetooth_adapters import BluetoothServiceInfoBleak
+from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
