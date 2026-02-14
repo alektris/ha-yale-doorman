@@ -155,10 +155,11 @@ class YaleDoormanConfigFlow(ConfigFlow, domain=DOMAIN):
                     },
                     options={
                         CONF_ALWAYS_CONNECTED: DEFAULT_ALWAYS_CONNECTED,
-                        CONF_ACTIVE_HOURS_START: DEFAULT_ACTIVE_HOURS_START,
-                        CONF_ACTIVE_HOURS_END: DEFAULT_ACTIVE_HOURS_END,
-                        CONF_ACTIVE_POLL_INTERVAL: DEFAULT_ACTIVE_POLL_INTERVAL,
-                        CONF_IDLE_POLL_INTERVAL: DEFAULT_IDLE_POLL_INTERVAL,
+                        CONF_WEEKDAY_START: DEFAULT_WEEKDAY_START,
+                        CONF_WEEKDAY_END: DEFAULT_WEEKDAY_END,
+                        CONF_WEEKEND_START: DEFAULT_WEEKEND_START,
+                        CONF_WEEKEND_END: DEFAULT_WEEKEND_END,
+                        CONF_WEEKEND_DAYS: DEFAULT_WEEKEND_DAYS,
                     },
                 )
 
