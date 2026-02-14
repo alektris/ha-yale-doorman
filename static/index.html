@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yale Doorman L3S – Live Dashboard</title>
+    <meta name="description" content="Real-time monitoring dashboard for Yale Doorman L3S smart lock via BLE">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        <circle cx="12" cy="16" r="1"/>
+                    </svg>
+                    <h1>Yale Doorman L3S</h1>
+                </div>
+                <span class="subtitle">BLE Monitor</span>
+            </div>
+            <div class="header-right">
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting…</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <!-- Sensor Cards -->
+            <section class="sensor-grid">
+                <!-- Lock State Card -->
+                <div class="card sensor-card" id="lockCard" data-state="unknown">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">Lock</span>
+                        <span class="card-value" id="lockState">Unknown</span>
+                    </div>
+                    <div class="card-indicator"></div>
+                </div>
+
+                <!-- Door State Card -->
+                <div class="card sensor-card" id="doorCard" data-state="unknown">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">Door</span>
+                        <span class="card-value" id="doorState">Unknown</span>
+                    </div>
+                    <div class="card-indicator"></div>
+                </div>
+
+                <!-- Battery Card -->
+                <div class="card sensor-card" id="batteryCard" data-state="unknown">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/>
+                            <line x1="23" y1="13" x2="23" y2="11"/>
+                            <rect class="battery-fill" id="batteryFill" x="3" y="8" width="0" height="8" rx="1" fill="currentColor" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">Battery</span>
+                        <span class="card-value" id="batteryLevel">–%</span>
+                    </div>
+                    <div class="card-indicator"></div>
+                </div>
+
+                <!-- Doorbell Card -->
+                <div class="card sensor-card" id="doorbellCard" data-state="idle">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">Doorbell</span>
+                        <span class="card-value" id="doorbellState">Idle</span>
+                    </div>
+                    <div class="card-indicator"></div>
+                </div>
+            </section>
+
+            <!-- Info Row -->
+            <section class="info-row">
+                <div class="card info-card">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Signal</span>
+                            <span class="info-value" id="rssiValue">– dBm</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Auto-Lock</span>
+                            <span class="info-value" id="autoLockValue">–</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Poll Mode</span>
+                            <span class="info-value" id="pollMode">–</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Last Updated</span>
+                            <span class="info-value" id="lastUpdated">–</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Event Timeline -->
+            <section class="timeline-section">
+                <h2 class="section-title">Event History</h2>
+                <div class="card timeline-card">
+                    <div class="timeline" id="timeline">
+                        <div class="timeline-empty">Waiting for events…</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <span>Yale Doorman L3S BLE Monitor</span>
+            <span class="footer-sep">·</span>
+            <span id="footerModel">–</span>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

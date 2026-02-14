@@ -1,0 +1,62 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Yale Doorman L3S",
+                "description": "Enter your lock's BLE details. You can find the BLE key in Home Assistant's debug logs when using the official Yale integration.",
+                "data": {
+                    "address": "BLE Address",
+                    "local_name": "Local Name (optional)",
+                    "key": "BLE Offline Key (32-char hex)",
+                    "slot": "Key Slot"
+                }
+            }
+        },
+        "error": {
+            "invalid_mac": "Invalid MAC address format (XX:XX:XX:XX:XX:XX)",
+            "invalid_key": "Key must be exactly 32 hexadecimal characters",
+            "invalid_slot": "Slot must be between 0 and 255"
+        },
+        "abort": {
+            "already_configured": "This lock is already configured"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Yale Doorman Options",
+                "description": "Configure connection behavior and active hours.",
+                "data": {
+                    "always_connected": "Always Connected (real-time updates)",
+                    "active_hours_start": "Active Hours Start (HH:MM)",
+                    "active_hours_end": "Active Hours End (HH:MM)",
+                    "active_poll_interval": "Active Poll Interval (seconds)",
+                    "idle_poll_interval": "Idle Poll Interval (seconds)"
+                }
+            }
+        },
+        "error": {
+            "invalid_time": "Invalid time format (use HH:MM)"
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+            "door": {
+                "name": "Door"
+            },
+            "doorbell": {
+                "name": "Doorbell"
+            }
+        },
+        "sensor": {
+            "battery_voltage": {
+                "name": "Battery Voltage"
+            }
+        },
+        "lock": {
+            "secure_mode": {
+                "name": "Secure Mode"
+            }
+        }
+    }
+}
