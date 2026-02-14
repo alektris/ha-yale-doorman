@@ -1,6 +1,7 @@
 # Yale Doorman L3S for Home Assistant
 
-![Icon](images/icon.png)
+<img src="images/icon.png" width="100" alt="Icon">
+
 
 Custom Home Assistant integration for the **Yale Doorman L3S** smart lock via Bluetooth Low Energy (BLE).
 

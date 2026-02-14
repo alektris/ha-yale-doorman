@@ -4,7 +4,10 @@ import logging
 import re
 from typing import Any
 import voluptuous as vol
-from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
+from homeassistant.components.bluetooth import (
+    BluetoothServiceInfoBleak,
+    async_discovered_service_info,
+)
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
@@ -54,6 +57,49 @@ class YaleDoormanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial setup step."""
+        if user_input is not None and CONF_ADDRESS in user_input:
+            if user_input[CONF_ADDRESS] == "manual":
+                return await self.async_step_manual()
+
+            address = user_input[CONF_ADDRESS]
+            for discovery in async_discovered_service_info(self.hass):
+                if discovery.address == address:
+                    self._discovery_info = discovery
+                    break
+
+            # Check cache for key
+            key, slot = self._try_get_key_from_cache(address)
+            if key:
+                self._discovered_key = key
+                self._discovered_slot = slot
+
+            return await self.async_step_manual()
+
+        if self._discovery_info:
+             return await self.async_step_manual()
+
+        # Scan for devices
+        devices = {}
+        for discovery in async_discovered_service_info(self.hass):
+            if (
+                465 in discovery.manufacturer_data
+                or "0000fe24-0000-1000-8000-00805f9b34fb" in discovery.service_uuids
+            ):
+                devices[discovery.address] = f"{discovery.name} ({discovery.address})"
+
+        if not devices:
+            return await self.async_step_manual()
+
+        devices["manual"] = "Enter Manually"
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({vol.Required(CONF_ADDRESS): vol.In(devices)}),
+            description_placeholders={},
+        )
+
+    async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Handle manual entry."""
         errors: dict[str, str] = {}
         default_address, default_name, default_key, default_slot = "", "", "", 1
 
@@ -99,7 +145,7 @@ class YaleDoormanConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="manual",
             data_schema=vol.Schema({
                 vol.Required(CONF_ADDRESS, default=default_address): str,
                 vol.Optional(CONF_LOCAL_NAME, default=default_name): str,

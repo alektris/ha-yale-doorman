@@ -2,8 +2,15 @@
     "config": {
         "step": {
             "user": {
-                "title": "Yale Doorman L3S Setup",
-                "description": "If your lock was discovered, the details are pre-filled below. Otherwise, enter them manually.\n\n**BLE Key:** If you have the 'August' cloud integration installed, the key might be auto-filled. If not, you must extract it from the cloud integration's debug logs.",
+                "title": "Yale Doorman Discovery",
+                "description": "Select a discovered lock or enter details manually.",
+                "data": {
+                    "address": "Bluetooth Device"
+                }
+            },
+            "manual": {
+                "title": "Yale Doorman Setup",
+                "description": "Enter the lock details manually.",
                 "data": {
                     "address": "BLE Address",
                     "local_name": "Local Name (optional)",
