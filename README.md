@@ -1,6 +1,9 @@
 # Yale Doorman L3S for Home Assistant
 
-<img src="https://raw.githubusercontent.com/alektris/ha-yale-doorman/main/icon.png" width="100" alt="Icon">
+# Yale Doorman L3S for Home Assistant
+
+<img src="https://brands.home-assistant.io/_/yalexs_ble/icon@2x.png" width="100" alt="Icon">
+
 
 
 
