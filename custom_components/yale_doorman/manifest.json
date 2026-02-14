@@ -10,6 +10,7 @@
         "august"
     ],
     "documentation": "https://github.com/alektris/ha-yale-doorman",
+    "issue_tracker": "https://github.com/alektris/ha-yale-doorman/issues",
     "iot_class": "local_push",
     "requirements": [
         "yalexs-ble==3.2.4"
@@ -20,5 +21,5 @@
             "service_uuid": "0000fe24-0000-1000-8000-00805f9b34fb"
         }
     ],
-    "version": "1.2.3"
+    "version": "1.2.4"
 }
