@@ -36,13 +36,14 @@
         "step": {
             "init": {
                 "title": "Yale Doorman Options",
-                "description": "Configure connection behavior and active hours.",
+                "description": "Configure connection behavior and active hours.\n\n**Always Connected**: Keeps the connection open during active hours for instant updates. Outside active hours, it disconnects to save battery.\n\n**Schedule**: Set different active hours for Weekdays vs. Weekends.",
                 "data": {
-                    "always_connected": "Always Connected (real-time updates)",
-                    "active_hours_start": "Active Hours Start (HH:MM)",
-                    "active_hours_end": "Active Hours End (HH:MM)",
-                    "active_poll_interval": "Active Poll Interval (seconds)",
-                    "idle_poll_interval": "Idle Poll Interval (seconds)"
+                    "always_connected": "Enable Schedule (Always Connected during active hours)",
+                    "weekend_days": "Weekend Days",
+                    "weekday_start": "Weekday Start Time (HH:MM)",
+                    "weekday_end": "Weekday End Time (HH:MM)",
+                    "weekend_start": "Weekend Start Time (HH:MM)",
+                    "weekend_end": "Weekend End Time (HH:MM)"
                 }
             }
         },

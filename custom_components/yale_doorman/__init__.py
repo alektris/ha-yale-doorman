@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import time as dt_time
+from datetime import datetime, time, timedelta
 
 from yalexs_ble import (
     AuthError,
@@ -21,22 +21,25 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import CALLBACK_TYPE, CoreState, Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_ACTIVE_HOURS_END,
-    CONF_ACTIVE_HOURS_START,
-    CONF_ACTIVE_POLL_INTERVAL,
     CONF_ALWAYS_CONNECTED,
-    CONF_IDLE_POLL_INTERVAL,
     CONF_KEY,
     CONF_LOCAL_NAME,
     CONF_SLOT,
-    DEFAULT_ACTIVE_HOURS_END,
-    DEFAULT_ACTIVE_HOURS_START,
-    DEFAULT_ACTIVE_POLL_INTERVAL,
+    CONF_WEEKDAY_END,
+    CONF_WEEKDAY_START,
+    CONF_WEEKEND_DAYS,
+    CONF_WEEKEND_END,
+    CONF_WEEKEND_START,
     DEFAULT_ALWAYS_CONNECTED,
-    DEFAULT_IDLE_POLL_INTERVAL,
+    DEFAULT_WEEKDAY_END,
+    DEFAULT_WEEKDAY_START,
+    DEFAULT_WEEKEND_DAYS,
+    DEFAULT_WEEKEND_END,
+    DEFAULT_WEEKEND_START,
     DEVICE_TIMEOUT,
 )
 from .models import YaleDoormanData
@@ -52,10 +55,12 @@ PLATFORMS: list[Platform] = [
 ]
 
 
-def _parse_time(time_str: str) -> dt_time:
+def _parse_time(time_str: str) -> time:
     """Parse HH:MM time string."""
-    parts = time_str.split(":")
-    return dt_time(int(parts[0]), int(parts[1]))
+    try:
+        return datetime.strptime(time_str, "%H:%M").time()
+    except ValueError:
+        return time(0, 0)
 
 
 async def async_setup_entry(
@@ -181,49 +186,58 @@ def _setup_active_hours(
     push_lock: PushLock,
 ) -> None:
     """Set up active hours scheduling."""
-    active_start_str = entry.options.get(
-        CONF_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START
-    )
-    active_end_str = entry.options.get(
-        CONF_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END
-    )
-
-    active_start = _parse_time(active_start_str)
-    active_end = _parse_time(active_end_str)
-
-    @callback
-    def _async_enter_active_hours(now) -> None:
-        """Enter active hours — enable always_connected."""
-        _LOGGER.info("Entering active hours — enabling always_connected")
-        push_lock._always_connected = True
-        push_lock._schedule_future_update_with_debounce(0.1)
-
-    @callback
-    def _async_exit_active_hours(now) -> None:
-        """Exit active hours — disable always_connected."""
-        _LOGGER.info("Exiting active hours — disabling always_connected")
+    if not entry.options.get(CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED):
         push_lock._always_connected = False
-        push_lock._cancel_keepalive_timer()
+        return
 
-    # Schedule time-based triggers
+    wd_start_str = entry.options.get(CONF_WEEKDAY_START, DEFAULT_WEEKDAY_START)
+    wd_end_str = entry.options.get(CONF_WEEKDAY_END, DEFAULT_WEEKDAY_END)
+    we_start_str = entry.options.get(CONF_WEEKEND_START, DEFAULT_WEEKEND_START)
+    we_end_str = entry.options.get(CONF_WEEKEND_END, DEFAULT_WEEKEND_END)
+
+    wd_start = _parse_time(wd_start_str)
+    wd_end = _parse_time(wd_end_str)
+    we_start = _parse_time(we_start_str)
+    we_end = _parse_time(we_end_str)
+
+    weekend_days = entry.options.get(CONF_WEEKEND_DAYS, DEFAULT_WEEKEND_DAYS)
+    # Ensure they are ints
+    weekend_days = [int(x) for x in weekend_days]
+
+    @callback
+    def _check_connection_status(now: datetime) -> None:
+        """Check if we should be connected based on schedule."""
+        is_weekend = now.weekday() in weekend_days
+        start = we_start if is_weekend else wd_start
+        end = we_end if is_weekend else wd_end
+
+        current = now.time()
+        is_active = False
+
+        if start <= end:
+            is_active = start <= current < end
+        else: # Spans midnight
+            is_active = start <= current or current < end
+
+        if is_active != push_lock._always_connected:
+            _LOGGER.debug(
+                "Schedule transition: Active=%s (Weekend=%s, Window=%s-%s, Now=%s)",
+                is_active, is_weekend, start, end, current
+            )
+            push_lock._always_connected = is_active
+            if is_active:
+                push_lock._schedule_future_update_with_debounce(0.1)
+            else:
+                push_lock._cancel_keepalive_timer()
+
     entry.async_on_unload(
-        async_track_time_change(
-            hass,
-            _async_enter_active_hours,
-            hour=active_start.hour,
-            minute=active_start.minute,
-            second=0,
+        async_track_time_interval(
+            hass, _check_connection_status, timedelta(minutes=1)
         )
     )
-    entry.async_on_unload(
-        async_track_time_change(
-            hass,
-            _async_exit_active_hours,
-            hour=active_end.hour,
-            minute=active_end.minute,
-            second=0,
-        )
-    )
+    
+    # Run immediate check
+    _check_connection_status(dt_util.now())
 
 
 async def _async_options_updated(

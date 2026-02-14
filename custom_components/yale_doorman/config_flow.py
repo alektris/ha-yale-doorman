@@ -11,11 +11,29 @@ from homeassistant.components.bluetooth import (
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 from .const import (
-    CONF_ACTIVE_HOURS_END, CONF_ACTIVE_HOURS_START, CONF_ACTIVE_POLL_INTERVAL,
-    CONF_ALWAYS_CONNECTED, CONF_IDLE_POLL_INTERVAL, CONF_KEY, CONF_LOCAL_NAME,
-    CONF_SLOT, DEFAULT_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_START,
-    DEFAULT_ACTIVE_POLL_INTERVAL, DEFAULT_ALWAYS_CONNECTED, DEFAULT_IDLE_POLL_INTERVAL, DOMAIN
+    CONF_ALWAYS_CONNECTED,
+    CONF_KEY,
+    CONF_LOCAL_NAME,
+    CONF_SLOT,
+    CONF_WEEKDAY_END,
+    CONF_WEEKDAY_START,
+    CONF_WEEKEND_DAYS,
+    CONF_WEEKEND_END,
+    CONF_WEEKEND_START,
+    DEFAULT_ALWAYS_CONNECTED,
+    DEFAULT_WEEKDAY_END,
+    DEFAULT_WEEKDAY_START,
+    DEFAULT_WEEKEND_DAYS,
+    DEFAULT_WEEKEND_END,
+    DEFAULT_WEEKEND_START,
+    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -176,25 +194,73 @@ class YaleDoormanOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             # Validate time format
-            start = user_input.get(CONF_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)
-            end = user_input.get(CONF_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END)
-            if not TIME_REGEX.match(start):
-                errors[CONF_ACTIVE_HOURS_START] = "invalid_time"
-            if not TIME_REGEX.match(end):
-                errors[CONF_ACTIVE_HOURS_END] = "invalid_time"
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
 
-            if not errors:
-                return self.async_create_entry(title="", data=user_input)
+        weekend_options = [
+            {"value": "0", "label": "Monday"},
+            {"value": "1", "label": "Tuesday"},
+            {"value": "2", "label": "Wednesday"},
+            {"value": "3", "label": "Thursday"},
+            {"value": "4", "label": "Friday"},
+            {"value": "5", "label": "Saturday"},
+            {"value": "6", "label": "Sunday"},
+        ]
 
-        current = self._config_entry.options
+        current_weekend_days = self._config_entry.options.get(
+            CONF_WEEKEND_DAYS, DEFAULT_WEEKEND_DAYS
+        )
+        # Ensure defaults are strings for the selector
+        current_weekend_days = [str(x) for x in current_weekend_days]
+
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Required(CONF_ALWAYS_CONNECTED, default=current.get(CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED)): bool,
-                vol.Required(CONF_ACTIVE_HOURS_START, default=current.get(CONF_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)): str,
-                vol.Required(CONF_ACTIVE_HOURS_END, default=current.get(CONF_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END)): str,
-                vol.Required(CONF_ACTIVE_POLL_INTERVAL, default=current.get(CONF_ACTIVE_POLL_INTERVAL, DEFAULT_ACTIVE_POLL_INTERVAL)): vol.All(int, vol.Range(min=30, max=3600)),
-                vol.Required(CONF_IDLE_POLL_INTERVAL, default=current.get(CONF_IDLE_POLL_INTERVAL, DEFAULT_IDLE_POLL_INTERVAL)): vol.All(int, vol.Range(min=300, max=7200)),
-            }),
-            errors=errors,
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ALWAYS_CONNECTED,
+                        default=self._config_entry.options.get(
+                            CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_WEEKEND_DAYS,
+                        default=current_weekend_days,
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=weekend_options,
+                            multiple=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_WEEKDAY_START,
+                        default=self._config_entry.options.get(
+                            CONF_WEEKDAY_START, DEFAULT_WEEKDAY_START
+                        ),
+                    ): str,
+                    vol.Required(
+                        CONF_WEEKDAY_END,
+                        default=self._config_entry.options.get(
+                            CONF_WEEKDAY_END, DEFAULT_WEEKDAY_END
+                        ),
+                    ): str,
+                    vol.Required(
+                        CONF_WEEKEND_START,
+                        default=self._config_entry.options.get(
+                            CONF_WEEKEND_START, DEFAULT_WEEKEND_START
+                        ),
+                    ): str,
+                    vol.Required(
+                        CONF_WEEKEND_END,
+                        default=self._config_entry.options.get(
+                            CONF_WEEKEND_END, DEFAULT_WEEKEND_END
+                        ),
+                    ): str,
+                }
+            ),
         )
