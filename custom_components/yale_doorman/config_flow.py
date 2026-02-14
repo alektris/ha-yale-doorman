@@ -187,13 +187,8 @@ class YaleDoormanConfigFlow(ConfigFlow, domain=DOMAIN):
 
 class YaleDoormanOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
-        self._config_entry = config_entry
+        self.config_entry = config_entry
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Handle options."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            # Validate time format
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -211,7 +206,8 @@ class YaleDoormanOptionsFlow(OptionsFlow):
             {"value": "6", "label": "Sunday"},
         ]
 
-        current_weekend_days = self._config_entry.options.get(
+        # Use self.config_entry (standard)
+        current_weekend_days = self.config_entry.options.get(
             CONF_WEEKEND_DAYS, DEFAULT_WEEKEND_DAYS
         )
         # Ensure defaults are strings for the selector
@@ -223,7 +219,7 @@ class YaleDoormanOptionsFlow(OptionsFlow):
                 {
                     vol.Required(
                         CONF_ALWAYS_CONNECTED,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED
                         ),
                     ): bool,
@@ -239,25 +235,25 @@ class YaleDoormanOptionsFlow(OptionsFlow):
                     ),
                     vol.Required(
                         CONF_WEEKDAY_START,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_WEEKDAY_START, DEFAULT_WEEKDAY_START
                         ),
                     ): str,
                     vol.Required(
                         CONF_WEEKDAY_END,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_WEEKDAY_END, DEFAULT_WEEKDAY_END
                         ),
                     ): str,
                     vol.Required(
                         CONF_WEEKEND_START,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_WEEKEND_START, DEFAULT_WEEKEND_START
                         ),
                     ): str,
                     vol.Required(
                         CONF_WEEKEND_END,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_WEEKEND_END, DEFAULT_WEEKEND_END
                         ),
                     ): str,
