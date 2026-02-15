@@ -76,8 +76,11 @@ async def async_setup_entry(
         CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED
     )
 
+    # Always initialize in passive mode (matches official yalexs_ble integration).
+    # This ensures BLE advertisements are always processed correctly.
+    # During active hours, we add periodic polling on top.
     push_lock = PushLock(
-        local_name, address, None, key, slot, always_connected=always_connected
+        local_name, address, None, key, slot, always_connected=False
     )
     id_ = local_name if has_unique_local_name else address
     push_lock.set_name(f"{entry.title} ({id_})")
@@ -185,9 +188,18 @@ def _setup_active_hours(
     entry: YaleDoormanConfigEntry,
     push_lock: PushLock,
 ) -> None:
-    """Set up active hours scheduling."""
+    """Set up active hours scheduling.
+
+    The PushLock is always initialized with always_connected=False so that
+    BLE advertisement processing works correctly at all times (matching the
+    official yalexs_ble integration behavior).
+
+    During active hours we add periodic polling via push_lock.update() which
+    forces a connect → read state → disconnect cycle every 30 seconds,
+    giving near-real-time updates without breaking the library internals.
+    """
     if not entry.options.get(CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED):
-        push_lock._always_connected = False
+        # Schedule disabled — pure passive mode, identical to official integration
         return
 
     wd_start_str = entry.options.get(CONF_WEEKDAY_START, DEFAULT_WEEKDAY_START)
@@ -201,43 +213,73 @@ def _setup_active_hours(
     we_end = _parse_time(we_end_str)
 
     weekend_days = entry.options.get(CONF_WEEKEND_DAYS, DEFAULT_WEEKEND_DAYS)
-    # Ensure they are ints
     weekend_days = [int(x) for x in weekend_days]
 
-    @callback
-    def _check_connection_status(now: datetime) -> None:
-        """Check if we should be connected based on schedule."""
+    polling_unsub: CALLBACK_TYPE | None = None
+    is_currently_active: bool = False
+
+    async def _async_poll_lock(now: datetime) -> None:
+        """Poll the lock for a state update."""
+        try:
+            await push_lock.update()
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Scheduled poll failed (will retry): %s", ex)
+
+    def _is_in_active_window(now: datetime) -> bool:
+        """Return True if current time falls within the active window."""
         is_weekend = now.weekday() in weekend_days
         start = we_start if is_weekend else wd_start
         end = we_end if is_weekend else wd_end
-
         current = now.time()
-        is_active = False
-
         if start <= end:
-            is_active = start <= current < end
-        else: # Spans midnight
-            is_active = start <= current or current < end
+            return start <= current < end
+        # Spans midnight
+        return start <= current or current < end
 
-        if is_active != push_lock._always_connected:
-            _LOGGER.debug(
-                "Schedule transition: Active=%s (Weekend=%s, Window=%s-%s, Now=%s)",
-                is_active, is_weekend, start, end, current
+    @callback
+    def _check_schedule(now: datetime) -> None:
+        """Check schedule and start/stop polling as needed."""
+        nonlocal polling_unsub, is_currently_active
+
+        should_be_active = _is_in_active_window(now)
+
+        if should_be_active and not is_currently_active:
+            _LOGGER.info("Entering active hours — starting periodic polling")
+            is_currently_active = True
+            polling_unsub = async_track_time_interval(
+                hass,
+                _async_poll_lock,
+                timedelta(seconds=30),
             )
-            push_lock._always_connected = is_active
-            if is_active:
-                push_lock._schedule_future_update_with_debounce(0.1)
-            else:
-                push_lock._cancel_keepalive_timer()
+            # Trigger an immediate poll
+            hass.async_create_task(push_lock.update())
 
+        elif not should_be_active and is_currently_active:
+            _LOGGER.info("Exiting active hours — stopping periodic polling")
+            is_currently_active = False
+            if polling_unsub is not None:
+                polling_unsub()
+                polling_unsub = None
+
+    # Check every minute
     entry.async_on_unload(
         async_track_time_interval(
-            hass, _check_connection_status, timedelta(minutes=1)
+            hass, _check_schedule, timedelta(minutes=1)
         )
     )
-    
+
+    # Clean up polling on unload
+    @callback
+    def _cleanup() -> None:
+        nonlocal polling_unsub
+        if polling_unsub is not None:
+            polling_unsub()
+            polling_unsub = None
+
+    entry.async_on_unload(_cleanup)
+
     # Run immediate check
-    _check_connection_status(dt_util.now())
+    _check_schedule(dt_util.now())
 
 
 async def _async_options_updated(
