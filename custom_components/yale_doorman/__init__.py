@@ -307,26 +307,17 @@ def _async_find_existing_service_info(
     hass: HomeAssistant, local_name: str, address: str
 ) -> bluetooth.BluetoothServiceInfoBleak | None:
     """Find existing service info for the lock."""
-    if local_name_is_unique(local_name):
-        return bluetooth.async_last_service_info(
-            hass, local_name, connectable=True
-        )
-    return bluetooth.async_last_service_info(
-        hass, address, connectable=True
-    )
+    return bluetooth.async_last_service_info(hass, address, connectable=False)
 
 
 def _bluetooth_callback_matcher(
     local_name: str, address: str
 ) -> bluetooth.BluetoothCallbackMatcher:
     """Create a Bluetooth callback matcher."""
-    if local_name_is_unique(local_name):
-        return bluetooth.BluetoothCallbackMatcher(
-            local_name=local_name, connectable=True
-        )
-    return bluetooth.BluetoothCallbackMatcher(
-        address=address, connectable=True
-    )
+    # Match exclusively by MAC address.
+    # Yale locks send state payloads in packets that may omit the local name
+    # and may not be connectable. Filtering by name would drop them.
+    return bluetooth.BluetoothCallbackMatcher(address=address, connectable=False)
 
 
 async def async_unload_entry(
