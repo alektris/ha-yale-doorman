@@ -31,8 +31,8 @@ async def async_setup_entry(
     if lock.lock_info and lock.lock_info.door_sense:
         entities.append(YaleDoormanDoorSensor(data))
 
-    # Doorbell sensor — always add, can report via BLE
-    entities.append(YaleDoormanDoorbellSensor(data))
+    # Connectivity sensor — tells if the integration thinks it's in range/connected
+    entities.append(YaleDoormanConnectivitySensor(data))
 
     async_add_entities(entities)
 
@@ -63,17 +63,26 @@ class YaleDoormanDoorSensor(YaleDoormanEntity, BinarySensorEntity):
         super()._async_update_state(new_state, lock_info, connection_info)
 
 
-class YaleDoormanDoorbellSensor(YaleDoormanEntity, BinarySensorEntity):
-    """Yale Doorman doorbell ring sensor."""
+class YaleDoormanConnectivitySensor(YaleDoormanEntity, BinarySensorEntity):
+    """Yale Doorman Bluetooth connectivity sensor."""
 
-    _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
-    _attr_translation_key = "doorbell"
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_translation_key = "connectivity"
 
     def __init__(self, data: YaleDoormanData) -> None:
-        """Initialize the doorbell sensor."""
+        """Initialize the connectivity sensor."""
         super().__init__(data)
-        self._attr_unique_id = f"{self._device.address}_doorbell"
-        self._attr_is_on = False
+        self._attr_unique_id = f"{self._device.address}_connectivity"
+
+    @property
+    def available(self) -> bool:
+        """Always available so it can show disconnected state."""
+        return True
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the lock is reachable (available)."""
+        return self._attr_available
 
     @callback
     def _async_update_state(
@@ -82,13 +91,7 @@ class YaleDoormanDoorbellSensor(YaleDoormanEntity, BinarySensorEntity):
         lock_info: LockInfo,
         connection_info: ConnectionInfo,
     ) -> None:
-        """Update the doorbell state.
-
-        Note: Doorbell ring detection depends on lock model support.
-        The Doorman L3S may not expose doorbell events via BLE —
-        this sensor is included for models that do support it.
-        """
-        # Doorbell state isn't directly in LockState from yalexs-ble.
-        # This sensor remains as a placeholder for potential future
-        # detection via advertisement data or unknown state bytes.
+        """Update the connectivity state."""
+        # The base entity updates self._attr_available based on BLE presence.
         super()._async_update_state(new_state, lock_info, connection_info)
+

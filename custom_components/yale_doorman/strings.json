@@ -56,8 +56,8 @@
             "door": {
                 "name": "Door"
             },
-            "doorbell": {
-                "name": "Doorbell"
+            "connectivity": {
+                "name": "Connection"
             }
         },
         "sensor": {
