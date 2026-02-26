@@ -121,13 +121,12 @@ async def async_setup_entry(
             f"{local_name} ({address}) not advertising yet"
         )
 
-    # Register BLE callback for ongoing advertisement updates
     entry.async_on_unload(
         bluetooth.async_register_callback(
             hass,
             _async_update_ble,
             _bluetooth_callback_matcher(local_name, push_lock.address),
-            bluetooth.BluetoothScanningMode.PASSIVE,
+            bluetooth.BluetoothScanningMode.ACTIVE,
         )
     )
 
